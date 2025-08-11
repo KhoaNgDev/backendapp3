@@ -1,0 +1,12 @@
+📱 User nhập biển số xe / SĐT → Ấn “Tra cứu”
+    ↓
+📡 Gửi API: /api/repairs/request-otp
+    → Kiểm tra có xe phù hợp không
+    → Nếu có → sinh OTP, lưu DB, gửi email
+    → Trả về: “OTP đã gửi đến email”
+    ↓
+📥 User nhập OTP vào form xác nhận
+    ↓
+📡 Gửi API: /api/repairs/verify-otp
+    → Kiểm tra OTP hợp lệ, còn hiệu lực
+    → Nếu đúng → trả về lịch sử sửa chữa

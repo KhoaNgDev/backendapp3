@@ -1,0 +1,10 @@
+Tóm tắt flow hoạt động
+Người dùng nhập SĐT hoặc biển số → nhấn “Tra cứu”
+
+Gửi OTP → nhập OTP → xác thực
+
+Hàm performSearch() được gọi → history chứa danh sách vehicles
+
+Hiển thị từng vehicle cùng lịch sử sửa chữa và nút Xuất PDF
+
+Khi click nút Xuất PDF, gọi API GET /vehicles/{id}/repairs/export, tải file về

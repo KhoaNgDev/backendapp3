@@ -1,0 +1,459 @@
+<template>
+  <div class="container py-5">
+    <div class="row justify-content-center">
+      <!-- Form tìm kiếm -->
+      <div class="col-lg-7 mb-4">
+        <div class="card shadow-sm">
+          <div class="card-body p-4">
+            <h3 class="mb-3">Tra cứu lịch sử sửa chữa</h3>
+            <p class="text-muted mb-4">Nhập số điện thoại hoặc biển số xe.</p>
+
+            <form @submit.prevent="handleSearch">
+              <!-- Số điện thoại -->
+              <div class="mb-3">
+                <label class="form-label">Số điện thoại</label>
+                <input
+                  type="text"
+                  v-model="phone"
+                  @input="validatePhone"
+                  :class="['form-control', phoneError ? 'is-invalid' : '']"
+                  placeholder="Ví dụ: 0935769312"
+                />
+                <div v-if="phoneError" class="invalid-feedback">
+                  {{ phoneError }}
+                </div>
+              </div>
+
+              <!-- Biển số xe -->
+              <div class="mb-3">
+                <label class="form-label">Biển số xe</label>
+                <input
+                  type="text"
+                  v-model="plate"
+                  @input="validatePlate"
+                  :class="['form-control', plateError ? 'is-invalid' : '']"
+                  placeholder="Ví dụ: 51K86195"
+                />
+                <div v-if="plateError" class="invalid-feedback">
+                  {{ plateError }}
+                </div>
+              </div>
+
+              <button type="submit" class="btn btn-primary w-100">
+                Tra cứu
+              </button>
+            </form>
+
+            <div v-if="loading" class="text-center mt-3">
+              <div class="spinner-border" role="status"></div>
+            </div>
+
+            <router-link to="/" class="btn btn-outline-secondary w-100 mt-3">
+              Quay về
+            </router-link>
+          </div>
+        </div>
+
+        <!-- Không có dữ liệu -->
+        <div
+          v-if="searched && history.length === 0"
+          class="alert alert-info mt-4"
+        >
+          Không tìm thấy lịch sử sửa chữa.
+        </div>
+
+        <!-- Danh sách lịch sử -->
+        <div
+          v-for="vehicle in history"
+          :key="vehicle.id"
+          class="card shadow-sm mt-4"
+        >
+          <div class="card-body p-4">
+            <h5 class="mb-3">Thông tin xe</h5>
+            <ul class="list-unstyled mb-4">
+              <li><strong>Biển số:</strong> {{ vehicle.plate_number }}</li>
+              <li><strong>Hãng:</strong> {{ vehicle.brand }}</li>
+              <li><strong>Model:</strong> {{ vehicle.model }}</li>
+              <li><strong>Màu sắc:</strong> {{ vehicle.color }}</li>
+              <li><strong>Năm sản xuất:</strong> {{ vehicle.year }}</li>
+              <li>
+                <strong>Chủ xe:</strong>
+                {{ vehicle.user?.name }} ({{ vehicle.user?.email }})
+              </li>
+            </ul>
+
+            <!-- Đợt sửa -->
+            <div v-if="vehicle.repairs.length">
+              <label class="form-label fw-bold">Chọn đợt sửa chữa:</label>
+              <select
+                class="form-select mb-4"
+                v-model="selectedRepair[vehicle.id]"
+              >
+                <option disabled value="">-- Chọn --</option>
+                <option
+                  v-for="repair in vehicle.repairs"
+                  :key="repair.id"
+                  :value="repair.id"
+                >
+                  {{ repair.repair_date }} -
+                  {{ formatCurrency(repair.total_cost) }}
+                </option>
+              </select>
+
+              <div
+                v-for="repair in vehicle.repairs"
+                :key="repair.id"
+                v-show="repair.id === selectedRepair[vehicle.id]"
+                class="border rounded p-4 bg-light"
+              >
+                <p><strong>Ngày sửa:</strong> {{ repair.repair_date }}</p>
+                <p>
+                  <strong>Ghi chú kỹ thuật viên:</strong>
+                  {{ repair.technician_note || "Không có" }}
+                </p>
+                <p>
+                  <strong>Tổng chi phí:</strong>
+                  {{ formatCurrency(repair.total_cost) }}
+                </p>
+                <p>
+                  <strong>Dịch vụ đã thực hiện:</strong>
+                  {{ repair.services_performed || "Không có" }}
+                </p>
+                <p>
+                  <strong>Phụ tùng thay thế:</strong>
+                  {{ repair.parts_replaced || "Không có" }}
+                </p>
+
+                <!-- Feedback -->
+                <div class="mt-4">
+                  <label class="form-label fw-bold">Đánh giá:</label>
+
+                  <!-- Feedbacks -->
+                  <div
+                    class="p-3 border rounded mb-2"
+                    v-for="fb in repair.repair_feedbacks"
+                    :key="fb.id"
+                    :class="fb._new ? 'bg-success-subtle' : 'bg-white'"
+                  >
+                    <div class="text-muted small mb-1">
+                      Ngày: {{ formatDateTime(fb.created_at) }} -
+                      <span class="text-warning">{{
+                        "⭐".repeat(fb.rating)
+                      }}</span>
+                    </div>
+
+                    <div class="border rounded p-2 bg-light mb-2">
+                      <div class="text-muted small mb-1">Khách hàng:</div>
+                      {{ fb.feedback }}
+                    </div>
+
+                    <!-- Phản hồi từ admin -->
+                    <div
+                      v-if="ratings[repair.id]?.adminReplies.length"
+                      class="mt-2 pl-3 border-l-2 border-blue-500"
+                    >
+                      <p class="font-semibold">Phản hồi từ admin:</p>
+                      <div
+                        v-for="reply in ratings[repair.id].adminReplies"
+                        :key="reply.id"
+                        class="text-sm text-blue-600"
+                      >
+                        - {{ reply.reply }}
+                      </div>
+                    </div>
+
+                    <!-- Các nút sửa/xóa -->
+                    <div
+                      class="d-flex justify-content-end gap-2"
+                      v-if="vehicle.user?.id === authUserId"
+                    >
+                      <button
+                        class="btn btn-sm btn-outline-primary"
+                        @click="toggleEditForm(repair.id)"
+                      >
+                        Sửa
+                      </button>
+                      <button
+                        class="btn btn-sm btn-outline-danger"
+                        @click="deleteFeedback(fb.id)"
+                      >
+                        Xoá
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Nút Đánh giá mới nếu chưa có feedback -->
+                  <div
+                    v-if="
+                      repair.repair_feedbacks.length === 0 &&
+                      vehicle.user?.id === authUserId
+                    "
+                  >
+                    <button
+                      class="btn btn-primary btn-sm mt-2"
+                      @click="toggleEditForm(repair.id)"
+                    >
+                      Đánh giá mới
+                    </button>
+                  </div>
+
+                  <!-- Form sửa/gửi -->
+                  <div
+                    v-if="showForm[repair.id]"
+                    class="p-3 border rounded bg-light mt-3"
+                  >
+                    <label class="form-label fw-bold">Số sao đánh giá:</label>
+                    <select
+                      class="form-select mb-2"
+                      v-model="ratings[repair.id].rating"
+                    >
+                      <option disabled value="0">Chọn số sao</option>
+                      <option v-for="n in 5" :key="n" :value="n">
+                        {{ n }} sao
+                      </option>
+                    </select>
+
+                    <textarea
+                      class="form-control mb-2"
+                      v-model="ratings[repair.id].feedback"
+                      placeholder="Nhập phản hồi của bạn"
+                    ></textarea>
+
+                    <button
+                      class="btn btn-success btn-sm w-100"
+                      @click="submitRating(vehicle.id, repair.id)"
+                    >
+                      Lưu đánh giá
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div v-else class="text-muted">Chưa có lịch sử sửa chữa.</div>
+          </div>
+        </div>
+      </div>
+      <!-- Sidebar -->
+      <div class="col-lg-4">
+        <div class="card shadow-sm mb-4">
+          <img src="/fe/images/9.jpg" class="card-img-top" alt="repair" />
+          <div class="card-body">
+            <ul class="list-unstyled mb-0">
+              <li class="mb-2"><strong>Hotline:</strong> +84 935 769 312</li>
+              <li class="mb-2">
+                <strong>Email:</strong> repair-system@repair-system.vn
+              </li>
+              <li><strong>Địa chỉ:</strong> 627 Nguyễn Hữu Trí, TP.HCM</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+<script setup>
+import { ref } from "vue";
+import api from "../services/api";
+import Swal from "sweetalert2";
+
+const phone = ref("");
+const plate = ref("");
+const phoneError = ref("");
+const plateError = ref("");
+const history = ref([]);
+const loading = ref(false);
+const searched = ref(false);
+const selectedRepair = ref({});
+const ratings = ref({});
+const showForm = ref({});
+
+// Lấy user đăng nhập từ localStorage
+const authUser = JSON.parse(localStorage.getItem("auth_user"));
+const authUserId = authUser?.id || null;
+
+const toggleEditForm = (repairId) => {
+  showForm.value[repairId] = !showForm.value[repairId];
+};
+
+// Kiểm tra đăng nhập
+const token = localStorage.getItem("auth_token");
+if (!token) {
+  Swal.fire("Bạn chưa đăng nhập", "Vui lòng đăng nhập để đánh giá.", "warning");
+  window.location.href = "/login";
+  throw new Error("Không có token");
+}
+
+// Validate input
+const validatePhone = () => {
+  phone.value = phone.value.replace(/[^\d]/g, "").slice(0, 11);
+  phoneError.value = "";
+};
+
+const validatePlate = () => {
+  plate.value = plate.value
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 8);
+  plateError.value = "";
+};
+
+// Regex kiểm tra định dạng
+const isValidPhone = (num) => /^(0|\+84)[3-9][0-9]{8}$/.test(num);
+const isValidPlate = (val) => /^[0-9]{2}[A-Z]{1}[0-9]{5}$/i.test(val);
+
+const formatCurrency = (val) =>
+  val
+    ? new Intl.NumberFormat("vi-VN", {
+        style: "currency",
+        currency: "VND",
+      }).format(val)
+    : "0 đ";
+
+// Xử lý tra cứu
+const handleSearch = async () => {
+  phoneError.value = "";
+  plateError.value = "";
+
+  if (!phone.value && !plate.value) {
+    Swal.fire(
+      "Thông báo",
+      "Vui lòng nhập số điện thoại hoặc biển số xe.",
+      "warning"
+    );
+    return;
+  }
+  if (phone.value && !isValidPhone(phone.value)) {
+    phoneError.value = "Số điện thoại không hợp lệ!";
+    return;
+  }
+  if (plate.value && !isValidPlate(plate.value)) {
+    plateError.value = "Biển số xe không hợp lệ!";
+    return;
+  }
+
+  loading.value = true;
+  searched.value = false;
+  history.value = [];
+  selectedRepair.value = {};
+  ratings.value = {};
+
+  try {
+    const { data } = await api.post("/repair-search", {
+      phone: phone.value.trim(),
+      plate: plate.value.trim(),
+    });
+
+    history.value = data;
+
+    history.value.forEach((vehicle) => {
+      if (vehicle.repairs?.length) {
+        selectedRepair.value[vehicle.id] = vehicle.repairs[0].id;
+        vehicle.repairs.forEach((r) => {
+          r.repair_feedbacks.forEach((fb) => {
+            ratings.value[fb.id] = {
+              rating: fb?.rating || 0,
+              feedback: fb?.feedback || "",
+              adminReplies: fb?.admin_replies || [],
+            };
+          });
+        });
+      }
+    });
+  } catch (e) {
+    handleError(e, "Không thể tra cứu lịch sử.");
+  } finally {
+    loading.value = false;
+    searched.value = true;
+  }
+};
+
+// Gửi hoặc update đánh giá
+const submitRating = async (vehicleId, repairId) => {
+  const rating = ratings.value[repairId];
+  if (!rating?.rating) {
+    Swal.fire("Thiếu thông tin", "Vui lòng chọn số sao.", "warning");
+    return;
+  }
+
+  try {
+    const { data } = await api.post("/submit-rating", {
+      repair_id: repairId,
+      feedback: rating.feedback,
+      rating: rating.rating,
+    });
+
+    const vehicle = history.value.find((v) => v.id === vehicleId);
+    if (!vehicle) return;
+
+    const repair = vehicle.repairs.find((r) => r.id === repairId);
+    if (!repair) return;
+
+    data._new = true;
+    repair.repair_feedbacks = [data];
+
+    showForm.value[repairId] = false;
+
+    setTimeout(() => {
+      data._new = false;
+    }, 3000);
+
+    Swal.fire("Cảm ơn", "Đánh giá của bạn đã được ghi nhận.", "success");
+  } catch (e) {
+    handleError(e, "Không thể gửi đánh giá.");
+  }
+};
+
+// Xoá feedback
+const deleteFeedback = async (feedbackId) => {
+  const confirm = await Swal.fire({
+    title: "Xoá đánh giá?",
+    text: "Bạn chắc chắn muốn xoá đánh giá này?",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Xoá",
+    cancelButtonText: "Huỷ",
+  });
+
+  if (!confirm.isConfirmed) return;
+
+  try {
+    await api.delete(`/feedback/${feedbackId}`);
+    history.value.forEach((vehicle) => {
+      vehicle.repairs.forEach((repair) => {
+        repair.repair_feedbacks = repair.repair_feedbacks.filter(
+          (fb) => fb.id !== feedbackId
+        );
+      });
+    });
+    Swal.fire("Đã xoá", "Phản hồi đã được xoá.", "success");
+  } catch (e) {
+    handleError(e, "Không thể xoá phản hồi.");
+  }
+};
+
+const handleError = (e, fallbackMessage) => {
+  console.error(e);
+  if (e.response?.data) {
+    const res = e.response.data;
+    let msg = res.message;
+    if (res.errors) {
+      msg = Object.values(res.errors).flat().join("<br>");
+    }
+    Swal.fire("Lỗi", msg, "error");
+  } else {
+    Swal.fire("Lỗi", fallbackMessage || "Đã xảy ra lỗi.", "error");
+  }
+};
+const formatDateTime = (val) => {
+  if (!val) return "";
+  const date = new Date(val);
+  return date.toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+</script>

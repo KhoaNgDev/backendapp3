@@ -1,0 +1,61 @@
+.user-hover {
+    position: relative;
+    cursor: pointer;
+}
+
+.user-hover::before {
+    content: "";
+    display: none;
+    position: absolute;
+    z-index: 999;
+    top: 100%;
+    left: 0;
+    margin-top: 8px;
+    width: 150px;
+    height: 150px;
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center;
+    border: 1px solid #ccc;
+    background-color: #fff;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.user-hover:hover::before {
+    display: block;
+    background-image: var(--hover-img);
+}
+
+#users-table_filter.dataTables_filter {
+    display: none !important;
+}
+
+.dataTables_wrapper .dataTables_paginate {
+    margin-top: 20px;
+    text-align: right;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 6px 12px !important;
+    margin: 0 2px !important;
+    color: #007bff !important;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+    background-color: #007bff;
+    color: white !important;
+    border-color: #007bff;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button.current {
+    background-color: #007bff;
+    color: white !important;
+    border-color: #007bff;
+    font-weight: bold;
+}
