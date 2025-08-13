@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api\Frontend;
+namespace App\Http\Controllers\API\Frontend;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\API\Frontend\AdminReplyRequest;
