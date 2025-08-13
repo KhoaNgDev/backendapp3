@@ -9,7 +9,7 @@ use App\Models\MaintenanceSchedules;
 use App\Models\Vehicle;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Http;
 
 class MaintenanceController extends Controller
 {
@@ -60,15 +60,45 @@ class MaintenanceController extends Controller
             return response()->json(['message' => 'Không có email khách hàng'], 422);
         }
 
-        $nextDate = Carbon::parse($reminder->next_maintenance_date);
-        Mail::to($user)->send(new MaintenanceReminderMail($vehicle, $repair, $nextDate));
+        $nextDate = Carbon::parse($reminder->next_maintenance_date)->format('d/m/Y');
 
-        $reminder->update([
-            'status' => 'sent',
-            'notified_at' => now(),
+        $apiKey = config('services.brevo.api_key');
+        $response = Http::withHeaders([
+            'accept' => 'application/json',
+            'api-key' => $apiKey,
+            'content-type' => 'application/json',
+        ])->post('https://api.brevo.com/v3/smtp/email', [
+            'sender' => [
+                'name' => 'Garage System',
+                'email' => 'nganhkhoa.becloud@gmail.com'
+            ],
+            'to' => [
+                [
+                    'email' => $user->email,
+                    'name' => $user->name
+                ]
+            ],
+            'subject' => 'Nhắc bảo trì xe',
+            'htmlContent' => "
+                <p>Xin chào {$user->name},</p>
+                <p>Xe của bạn ({$vehicle->plate_number}) dự kiến bảo trì vào ngày <strong>{$nextDate}</strong>.</p>
+                <p>Vui lòng liên hệ với chúng tôi để đặt lịch.</p>
+                <p>Trân trọng,<br>Garage</p>
+            ",
         ]);
 
-        return response()->json(['message' => 'Đã gửi nhắc bảo trì thành công!']);
+        if ($response->successful()) {
+            $reminder->update([
+                'status' => 'sent',
+                'notified_at' => now(),
+            ]);
+            return response()->json(['message' => 'Đã gửi nhắc bảo trì thành công!']);
+        } else {
+            return response()->json([
+                'message' => 'Gửi email thất bại',
+                'error' => $response->json()
+            ], 500);
+        }
     }
     public function export(Request $request)
     {

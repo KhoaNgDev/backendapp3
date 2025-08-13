@@ -4,6 +4,7 @@ namespace App\Http\Traits;
 
 use App\Mail\OtpMail;
 use App\Models\User;
+use App\Services\BrevoService;
 use Exception;
 use Illuminate\Support\Facades\Mail;
 
@@ -28,7 +29,11 @@ trait OtpHandler
             'otp_context' => $context,
         ]);
 
-        Mail::to($user->email)->send(new OtpMail($otp, $context));
+        app(BrevoService::class)->sendEmail(
+            $user->email,
+            'Mã OTP của bạn',
+            view('mail.otp', ['otp' => $otp, 'context' => $context])->render()
+        );
     }
 
     public function verifyOtp(User $user, string $otp, string $context = 'login'): void

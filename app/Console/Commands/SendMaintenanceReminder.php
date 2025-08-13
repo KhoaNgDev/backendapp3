@@ -7,17 +7,25 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\MaintenanceReminderMail;
 use App\Models\MaintenanceSchedules;
+use App\Services\BrevoService;
 use Carbon\Carbon;
-
 class SendMaintenanceReminder extends Command
 {
     protected $signature = 'maintenance:remind';
     protected $description = 'Gửi nhắc nhở bảo trì định kỳ tới khách hàng';
 
+    protected $brevo;
+
+    public function __construct(BrevoService $brevo)
+    {
+        parent::__construct();
+        $this->brevo = $brevo;
+    }
+
     public function handle()
     {
         try {
-            $today = Carbon::today()->addDays(1); // Ngày mai
+            $today = now()->addDay();
             $schedules = MaintenanceSchedules::with(['vehicle.user', 'repair'])
                 ->whereDate('next_maintenance_date', $today)
                 ->where('status', 'pending')
@@ -31,12 +39,18 @@ class SendMaintenanceReminder extends Command
                     continue;
                 }
 
-                Mail::to($user->email)->send(
-                    new MaintenanceReminderMail(
-                        $schedule->vehicle,
-                        $schedule->repair,
-                        $schedule->next_maintenance_date
-                    )
+                $subject = 'Nhắc nhở bảo trì định kỳ';
+                $htmlContent = view('emails.maintenance_reminder', [
+                    'vehicle' => $schedule->vehicle,
+                    'repair' => $schedule->repair,
+                    'date' => $schedule->next_maintenance_date
+                ])->render();
+
+                $this->brevo->sendEmail(
+                    $user->email,
+                    $user->name ?? 'Khách hàng',
+                    $subject,
+                    $htmlContent
                 );
 
                 $schedule->update([

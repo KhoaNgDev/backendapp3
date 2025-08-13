@@ -2,30 +2,37 @@
 
 namespace App\Services;
 
-use SendinBlue\Client\Configuration;
-use SendinBlue\Client\Api\TransactionalEmailsApi;
-use SendinBlue\Client\Model\SendSmtpEmail;
-use GuzzleHttp\Client;
+use Illuminate\Support\Facades\Http;
 
 class BrevoService
 {
-    protected $apiInstance;
+    protected string $apiKey;
 
     public function __construct()
     {
-        $config = Configuration::getDefaultConfiguration()->setApiKey('api-key', config('services.brevo.api_key'));
-        $this->apiInstance = new TransactionalEmailsApi(new Client(), $config);
+        $this->apiKey = config('services.brevo.api_key');
     }
 
-    public function sendEmail($toEmail, $toName, $subject, $htmlContent)
+    public function sendEmail(string $to, string $subject, string $htmlContent): void
     {
-        $sendSmtpEmail = new SendSmtpEmail([
-            'to' => [[ 'email' => $toEmail, 'name' => $toName ]],
-            'sender' => [ 'email' => 'nganhkhoa.becloud@gmail.com', 'name' => 'Repairs Searching' ],
+        $response = Http::withHeaders([
+            'accept' => 'application/json',
+            'api-key' => $this->apiKey,
+            'content-type' => 'application/json',
+        ])->post('https://api.brevo.com/v3/smtp/email', [
+            'sender' => [
+                'name' => config('mail.from.name'),
+                'email' => config('mail.from.address'),
+            ],
+            'to' => [
+                ['email' => $to],
+            ],
             'subject' => $subject,
-            'htmlContent' => $htmlContent
+            'htmlContent' => $htmlContent,
         ]);
 
-        return $this->apiInstance->sendTransacEmail($sendSmtpEmail);
+        if ($response->failed()) {
+            throw new \Exception('Gửi email thất bại: ' . $response->body());
+        }
     }
 }
