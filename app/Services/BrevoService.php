@@ -1,25 +1,24 @@
 <?php
 
 namespace App\Services;
-
+use SendinBlue\Client\Configuration;
+use SendinBlue\Client\Api\TransactionalEmailsApi;
+use SendinBlue\Client\Model\SendSmtpEmail;
 use Illuminate\Support\Facades\Http;
 
 class BrevoService
 {
-    protected string $apiKey;
+    protected $api;
 
     public function __construct()
     {
-        $this->apiKey = config('services.brevo.api_key');
+        $config = Configuration::getDefaultConfiguration()->setApiKey('api-key', env('BREVO_API_KEY'));
+        $this->api = new TransactionalEmailsApi(null, $config);
     }
 
-    public function sendEmail(string $to, string $subject, string $htmlContent): void
+    public function sendEmail($to, $subject, $htmlContent)
     {
-        $response = Http::withHeaders([
-            'accept' => 'application/json',
-            'api-key' => $this->apiKey,
-            'content-type' => 'application/json',
-        ])->post('https://api.brevo.com/v3/smtp/email', [
+        $sendSmtpEmail = new SendSmtpEmail([
             'sender' => [
                 'name' => config('mail.from.name'),
                 'email' => config('mail.from.address'),
@@ -31,8 +30,6 @@ class BrevoService
             'htmlContent' => $htmlContent,
         ]);
 
-        if ($response->failed()) {
-            throw new \Exception('Gửi email thất bại: ' . $response->body());
-        }
+        return $this->api->sendTransacEmail($sendSmtpEmail);
     }
 }
