@@ -78,6 +78,8 @@
         document.querySelectorAll('.send-email-btn').forEach(btn => {
             btn.addEventListener('click', function() {
                 const id = this.dataset.id;
+                const originalText = this.textContent;
+                const button = this;
 
                 Swal.fire({
                     title: 'Gửi nhắc bảo trì?',
@@ -90,6 +92,10 @@
                     cancelButtonText: 'Hủy'
                 }).then((result) => {
                     if (result.isConfirmed) {
+                        // Disable button, show "Đang gửi..."
+                        button.disabled = true;
+                        button.textContent = 'Đang gửi...';
+
                         fetch(`{{ url('admin/maintenance/send-reminder-email') }}/${id}`, {
                                 method: 'POST',
                                 headers: {
@@ -121,22 +127,29 @@
                                     statusCell.innerHTML =
                                         `<span class="text-success fw-bold">Đã gửi</span>`;
                                     actionCell.innerHTML =
-                                        `<button class="btn btn-sm btn-secondary">Gửi lại</button>`;
+                                        `<button class="btn btn-sm btn-secondary send-email-btn" data-id="${id}">Gửi lại</button>`;
 
                                     row.style.backgroundColor = '#e8f5e9';
                                     setTimeout(() => row.style.backgroundColor = '', 3000);
-                                }
 
+                                    // Re-attach event listener cho nút Gửi lại vừa tạo
+                                    actionCell.querySelector('.send-email-btn')
+                                        .addEventListener('click', arguments.callee);
+                                }
                             })
                             .catch(err => {
-                                console.error(err); 
+                                console.error(err);
                                 Swal.fire({
                                     icon: 'error',
                                     title: 'Lỗi',
                                     text: 'Có vấn đề khi gửi email, vui lòng đợi lại sau.'
                                 });
+                            })
+                            .finally(() => {
+                                // Bật lại button và text cũ dù thành công hay lỗi
+                                button.disabled = false;
+                                button.textContent = originalText;
                             });
-
                     }
                 });
             });
