@@ -2,7 +2,7 @@
 use App\Http\Controllers\API\Auth\LoginController;
 use App\Http\Controllers\API\Frontend\ExportRepairPdfController;
 use App\Http\Controllers\API\Frontend\RepairLookupController;
-use App\Http\Controllers\Api\Frontend\RepairRatingController;
+use App\Http\Controllers\API\Frontend\RepairRatingController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('client')
