@@ -7,8 +7,7 @@ return [
     'allowed_methods' => ['*'],
 
     'allowed_origins' => [
-        'http://192.168.10.91:3000',
-        'http://192.168.10.91:3000',
+        'https://app3.webnew.info.vn'
     ],
 
     'allowed_origins_patterns' => [],
