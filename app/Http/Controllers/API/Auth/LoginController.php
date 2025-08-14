@@ -6,20 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\API\Frontend\LoginRequest;
 use App\Http\Requests\API\Frontend\SendOtpRequest;
 use App\Models\User;
-use App\Services\BrevoService;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 
 class LoginController extends Controller
 {
-    protected $brevo;
-
-    public function __construct(BrevoService $brevo)
-    {
-        $this->brevo = $brevo;
-    }
     public function sendOtp(SendOtpRequest $request)
     {
         $user = User::where('phone', $request->phone)->first();
@@ -42,28 +36,9 @@ class LoginController extends Controller
             'otp_attempts' => 0,
         ]);
 
-        // Gửi qua Brevo API
-        $subject = 'Mã OTP đăng nhập';
-        $htmlContent = "<p>Mã OTP của bạn là: <strong>{$otp}</strong></p>";
-        try {
-            $this->brevo->sendEmail(
-                $user->email,
-                $user->name ?? 'Khách hàng',
-                $subject,
-                $htmlContent
-            );
-        } catch (\Exception $e) {
-            Log::error('Gửi OTP qua Brevo thất bại', [
-                'error' => $e->getMessage(),
-                'email' => $user->email
-            ]);
-
-            return response()->json([
-                'message' => 'Không thể gửi OTP, vui lòng thử lại sau.'
-            ], 500);
-        }
-
-
+        Mail::raw("Mã OTP của bạn là: {$otp}", function ($message) use ($user) {
+            $message->to($user->email)->subject('Mã OTP đăng nhập');
+        });
 
         Log::info('OTP sent', ['user_id' => $user->id, 'phone' => $user->phone]);
 
